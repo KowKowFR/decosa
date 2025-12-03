@@ -4,10 +4,22 @@ model User {
   email         String
   emailVerified Boolean   @default(false)
   image         String?
+  bio           String?   @db.Text
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
+  
+  // Relations d'authentification
   sessions      Session[]
   accounts      Account[]
+  
+  // Relations sociales
+  posts         Post[]    @relation("PostAuthor")
+  comments      Comment[] @relation("CommentAuthor")
+  postLikes     Like[]    @relation("PostLikes")
+  commentLikes  CommentLike[] @relation("CommentLikes")
+  reports       Report[]  @relation("Reports")
+  followers     Follow[]  @relation("Followers")
+  following     Follow[]  @relation("Following")
 
   @@unique([email])
   @@map("user")

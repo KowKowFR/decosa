@@ -23,6 +23,7 @@ First, install the dependencies:
 ```bash
 bun install
 ```
+
 ## Database Setup
 
 This project uses PostgreSQL with Prisma.
@@ -31,10 +32,10 @@ This project uses PostgreSQL with Prisma.
 2. Update your `apps/server/.env` file with your PostgreSQL connection details.
 
 3. Generate the Prisma client and push the schema:
+
 ```bash
 bun run db:push
 ```
-
 
 Then, run the development server:
 
@@ -44,12 +45,6 @@ bun run dev
 
 Open [http://localhost:3001](http://localhost:3001) in your browser to see the web application.
 The API is running at [http://localhost:3000](http://localhost:3000).
-
-
-
-
-
-
 
 ## Project Structure
 
@@ -74,3 +69,31 @@ decosa/
 - `bun run db:push`: Push schema changes to database
 - `bun run db:studio`: Open database studio UI
 - `bun run check`: Run Biome formatting and linting
+
+## Deployment
+
+Pour déployer l'application sur AWS EC2, consultez le guide complet dans [DEPLOY_EC2.md](./DEPLOY_EC2.md).
+
+### Déploiement rapide
+
+1. **Sur votre instance EC2**, exécutez le script de configuration :
+
+   ```bash
+   ./scripts/setup-ec2.sh
+   ```
+
+2. **Clonez le repository** et configurez les variables d'environnement
+
+3. **Déployez** :
+
+   ```bash
+   ./scripts/deploy.sh
+   ```
+
+4. **Démarrez avec PM2** :
+   ```bash
+   cd apps/server && pm2 start ecosystem.config.js
+   cd ../web && pm2 start ecosystem.config.js
+   ```
+
+Pour plus de détails, voir [DEPLOY_EC2.md](./DEPLOY_EC2.md).

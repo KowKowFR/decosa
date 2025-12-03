@@ -31,7 +31,10 @@
     "db:down": "turbo -F @decosa/db db:down"
   },
   "dependencies": {
+    "@aws-sdk/s3-request-presigner": "^3.943.0",
+    "@radix-ui/react-slot": "^1.2.4",
     "dotenv": "^17.2.2",
+    "framer-motion": "^12.23.25",
     "zod": "^4.1.11"
   },
   "devDependencies": {

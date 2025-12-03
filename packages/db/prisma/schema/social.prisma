@@ -1,0 +1,131 @@
+// ============================================
+// MODÈLES SOCIAUX - Decosa
+// ============================================
+// Ce fichier contient tous les modèles Prisma
+// pour les fonctionnalités sociales de l'application
+
+model Post {
+  id          String    @id @default(cuid())
+  title       String
+  content     String    @db.Text
+  image       String?
+  authorId    String
+  author      User      @relation("PostAuthor", fields: [authorId], references: [id], onDelete: Cascade)
+  
+  likes       Like[]
+  comments    Comment[]
+  reports     Report[]
+  
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  deletedAt   DateTime?
+  
+  @@index([authorId])
+  @@index([createdAt])
+  @@index([deletedAt])
+  @@map("post")
+}
+
+model Comment {
+  id          String    @id @default(cuid())
+  content     String    @db.Text
+  postId      String
+  post        Post      @relation(fields: [postId], references: [id], onDelete: Cascade)
+  authorId    String
+  author      User      @relation("CommentAuthor", fields: [authorId], references: [id], onDelete: Cascade)
+  
+  likes       CommentLike[]
+  reports     Report[]
+  
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  deletedAt   DateTime?
+  
+  @@index([postId])
+  @@index([authorId])
+  @@index([createdAt])
+  @@map("comment")
+}
+
+model Like {
+  id          String    @id @default(cuid())
+  postId      String
+  post        Post      @relation(fields: [postId], references: [id], onDelete: Cascade)
+  userId      String
+  user        User      @relation("PostLikes", fields: [userId], references: [id], onDelete: Cascade)
+  createdAt   DateTime  @default(now())
+  
+  @@unique([postId, userId])
+  @@index([postId])
+  @@index([userId])
+  @@map("like")
+}
+
+model CommentLike {
+  id          String    @id @default(cuid())
+  commentId   String
+  comment     Comment   @relation(fields: [commentId], references: [id], onDelete: Cascade)
+  userId      String
+  user        User      @relation("CommentLikes", fields: [userId], references: [id], onDelete: Cascade)
+  createdAt   DateTime  @default(now())
+  
+  @@unique([commentId, userId])
+  @@index([commentId])
+  @@index([userId])
+  @@map("comment_like")
+}
+
+model Report {
+  id          String    @id @default(cuid())
+  reason      String    @db.Text
+  type        ReportType @default(POST)
+  
+  postId      String?
+  post        Post?     @relation(fields: [postId], references: [id], onDelete: Cascade)
+  commentId   String?
+  comment     Comment?  @relation(fields: [commentId], references: [id], onDelete: Cascade)
+  
+  reporterId  String
+  reporter    User      @relation("Reports", fields: [reporterId], references: [id], onDelete: Cascade)
+  
+  status      ReportStatus @default(PENDING)
+  reviewedBy  String?
+  reviewedAt  DateTime?
+  notes       String?   @db.Text
+  
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  
+  @@index([postId])
+  @@index([commentId])
+  @@index([reporterId])
+  @@index([status])
+  @@map("report")
+}
+
+model Follow {
+  id          String    @id @default(cuid())
+  followerId  String
+  follower    User      @relation("Followers", fields: [followerId], references: [id], onDelete: Cascade)
+  followingId String
+  following   User      @relation("Following", fields: [followingId], references: [id], onDelete: Cascade)
+  createdAt   DateTime  @default(now())
+  
+  @@unique([followerId, followingId])
+  @@index([followerId])
+  @@index([followingId])
+  @@map("follow")
+}
+
+enum ReportType {
+  POST
+  COMMENT
+}
+
+enum ReportStatus {
+  PENDING
+  REVIEWED
+  RESOLVED
+  DISMISSED
+}
+
