@@ -7,13 +7,13 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { motion } from "framer-motion";
 import Link from "next/link";
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { CheckCircle2 } from "lucide-react";
 import { authClient } from "@/lib/auth-client";
 import { useToast } from "@/hooks/use-toast";
 
-export default function ResetPasswordPage() {
+function ResetPasswordForm() {
 	const router = useRouter();
 	const searchParams = useSearchParams();
 	const { toast } = useToast();
@@ -194,5 +194,28 @@ export default function ResetPasswordPage() {
 				</div>
 			</motion.div>
 		</div>
+	);
+}
+
+export default function ResetPasswordPage() {
+	return (
+		<Suspense
+			fallback={
+				<div className="min-h-screen flex items-center justify-center p-4">
+					<div className="glass-strong rounded-2xl p-8 shadow-2xl">
+						<div className="flex flex-col items-center">
+							<div className="h-16 w-16 rounded-xl bg-gradient-to-br from-primary to-accent flex items-center justify-center mb-4 animate-pulse">
+								<span className="text-primary-foreground font-bold text-3xl">
+									d
+								</span>
+							</div>
+							<p className="text-muted-foreground">Loading...</p>
+						</div>
+					</div>
+				</div>
+			}
+		>
+			<ResetPasswordForm />
+		</Suspense>
 	);
 }

@@ -2,17 +2,33 @@
 
 Ce guide vous explique comment déployer votre application decosa sur une instance EC2 AWS.
 
+## Architecture
+
+Votre application utilise deux sous-domaines :
+
+- **Frontend** : `decosa.samous.fr` (Next.js sur le port 3001)
+- **API Backend** : `api.samous.fr` (Hono sur le port 3000)
+
+Les deux services tournent sur la même instance EC2 et sont accessibles via Nginx en reverse proxy.
+
 ## Prérequis
 
 - Un compte AWS
 - Une instance EC2 (Ubuntu 22.04 LTS recommandé)
-- Un domaine (optionnel, pour HTTPS)
+- Deux sous-domaines configurés : `decosa.samous.fr` et `api.samous.fr`
 - Une base de données PostgreSQL (RDS ou sur l'instance EC2)
 - Un bucket S3 configuré (voir `S3_SETUP.md`)
 
 ## Étape 1 : Préparer l'instance EC2
 
-### 1.1 Créer une instance EC2
+### 1.1 Configurer les DNS
+
+Avant de créer l'instance, configurez vos enregistrements DNS pour pointer vers l'IP de votre instance EC2 :
+
+- **A Record** : `decosa.samous.fr` → IP de votre instance EC2
+- **A Record** : `api.samous.fr` → IP de votre instance EC2
+
+### 1.2 Créer une instance EC2
 
 1. Connectez-vous à la console AWS
 2. Allez dans EC2 → Launch Instance
@@ -26,6 +42,7 @@ Ce guide vous explique comment déployer votre application decosa sur une instan
    - **Port 3001 (Frontend)** : 127.0.0.1 (uniquement localhost)
 6. Créez ou sélectionnez une Key Pair
 7. Lancez l'instance
+8. **Important** : Notez l'IP publique de l'instance et mettez à jour vos DNS
 
 ### 1.2 Se connecter à l'instance
 
@@ -118,7 +135,7 @@ DATABASE_URL="postgresql://decosa:votre_mot_de_passe@localhost:5432/decosa?schem
 # Server
 PORT=3000
 NODE_ENV=production
-CORS_ORIGIN=https://votre-domaine.com
+CORS_ORIGIN=https://decosa.samous.fr
 
 # Auth
 GITHUB_CLIENT_ID=votre_github_client_id
@@ -132,7 +149,8 @@ AWS_S3_BUCKET_NAME=decosa-storage
 
 # Better Auth
 BETTER_AUTH_SECRET=generer_une_cle_secrete_aleatoire_32_caracteres
-BETTER_AUTH_URL=https://votre-domaine.com
+BETTER_AUTH_URL=https://api.samous.fr
+# Note: Cette URL doit pointer vers votre API (api.samous.fr)
 ```
 
 ### 5.2 Variables d'environnement du frontend
@@ -145,9 +163,7 @@ nano .env.local
 ```
 
 ```env
-NEXT_PUBLIC_SERVER_URL=https://votre-domaine.com
-# Ou si vous utilisez un sous-domaine pour l'API :
-# NEXT_PUBLIC_SERVER_URL=https://api.votre-domaine.com
+NEXT_PUBLIC_SERVER_URL=https://api.samous.fr
 ```
 
 ### 5.3 Générer une clé secrète pour Better Auth
@@ -166,8 +182,8 @@ Copiez le résultat dans `BETTER_AUTH_SECRET`.
 cd ~/decosa
 
 # Générer le client Prisma
-bun run db:generate
 
+bun run db:generate
 # Appliquer les migrations
 bun run db:migrate
 ```
@@ -275,15 +291,22 @@ pm2 save
 
 ## Étape 8 : Configurer Nginx (Reverse Proxy)
 
+Vous avez deux sous-domaines :
+
+- `decosa.samous.fr` pour le frontend
+- `api.samous.fr` pour l'API backend
+
+### 8.1 Configuration pour le frontend (decosa.samous.fr)
+
 ```bash
-sudo nano /etc/nginx/sites-available/decosa
+sudo nano /etc/nginx/sites-available/decosa-frontend
 ```
 
 ```nginx
-# Redirection HTTP vers HTTPS
+# Redirection HTTP vers HTTPS pour le frontend
 server {
     listen 80;
-    server_name votre-domaine.com www.votre-domaine.com;
+    server_name decosa.samous.fr;
 
     location /.well-known/acme-challenge/ {
         root /var/www/html;
@@ -294,14 +317,14 @@ server {
     }
 }
 
-# Configuration HTTPS
+# Configuration HTTPS pour le frontend
 server {
     listen 443 ssl http2;
-    server_name votre-domaine.com www.votre-domaine.com;
+    server_name decosa.samous.fr;
 
     # Certificats SSL (seront générés par Certbot)
-    ssl_certificate /etc/letsencrypt/live/votre-domaine.com/fullchain.pem;
-    ssl_certificate_key /etc/letsencrypt/live/votre-domaine.com/privkey.pem;
+    ssl_certificate /etc/letsencrypt/live/decosa.samous.fr/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/decosa.samous.fr/privkey.pem;
 
     # Configuration SSL
     ssl_protocols TLSv1.2 TLSv1.3;
@@ -325,9 +348,62 @@ server {
         proxy_set_header X-Forwarded-Proto $scheme;
         proxy_cache_bypass $http_upgrade;
     }
+}
+```
+
+### 8.2 Configuration pour l'API (api.samous.fr)
+
+```bash
+sudo nano /etc/nginx/sites-available/decosa-api
+```
+
+```nginx
+# Redirection HTTP vers HTTPS pour l'API
+server {
+    listen 80;
+    server_name api.samous.fr;
+
+    location /.well-known/acme-challenge/ {
+        root /var/www/html;
+    }
+
+    location / {
+        return 301 https://$server_name$request_uri;
+    }
+}
+
+# Configuration HTTPS pour l'API
+server {
+    listen 443 ssl http2;
+    server_name api.samous.fr;
+
+    # Certificats SSL (seront générés par Certbot)
+    ssl_certificate /etc/letsencrypt/live/api.samous.fr/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/api.samous.fr/privkey.pem;
+
+    # Configuration SSL
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_ciphers HIGH:!aNULL:!MD5;
+    ssl_prefer_server_ciphers on;
+
+    # Headers de sécurité
+    add_header X-Frame-Options "SAMEORIGIN" always;
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header X-XSS-Protection "1; mode=block" always;
+
+    # CORS headers (si nécessaire)
+    add_header Access-Control-Allow-Origin "https://decosa.samous.fr" always;
+    add_header Access-Control-Allow-Methods "GET, POST, PUT, DELETE, OPTIONS" always;
+    add_header Access-Control-Allow-Headers "Content-Type, Authorization, Cookie" always;
+    add_header Access-Control-Allow-Credentials "true" always;
+
+    # Gérer les requêtes OPTIONS pour CORS
+    if ($request_method = 'OPTIONS') {
+        return 204;
+    }
 
     # Proxy pour l'API backend
-    location /api {
+    location / {
         proxy_pass http://localhost:3000;
         proxy_http_version 1.1;
         proxy_set_header Host $host;
@@ -339,9 +415,12 @@ server {
 }
 ```
 
+### 8.3 Activer les configurations
+
 ```bash
-# Activer le site
-sudo ln -s /etc/nginx/sites-available/decosa /etc/nginx/sites-enabled/
+# Activer les sites
+sudo ln -s /etc/nginx/sites-available/decosa-frontend /etc/nginx/sites-enabled/
+sudo ln -s /etc/nginx/sites-available/decosa-api /etc/nginx/sites-enabled/
 
 # Tester la configuration
 sudo nginx -t
@@ -353,8 +432,9 @@ sudo systemctl restart nginx
 ## Étape 9 : Configurer SSL avec Let's Encrypt
 
 ```bash
-# Obtenir un certificat SSL
-sudo certbot --nginx -d votre-domaine.com -d www.votre-domaine.com
+# Obtenir des certificats SSL pour les deux sous-domaines
+sudo certbot --nginx -d decosa.samous.fr
+sudo certbot --nginx -d api.samous.fr
 
 # Certbot configurera automatiquement Nginx
 # Renouvellement automatique (déjà configuré par certbot)
@@ -365,9 +445,9 @@ sudo certbot --nginx -d votre-domaine.com -d www.votre-domaine.com
 1. Allez sur GitHub → Settings → Developer settings → OAuth Apps
 2. Créez une nouvelle OAuth App :
    - **Application name** : decosa
-   - **Homepage URL** : `https://votre-domaine.com`
-   - **Authorization callback URL** : `https://votre-domaine.com/api/auth/callback/github`
-3. Copiez le Client ID et Client Secret dans vos variables d'environnement
+   - **Homepage URL** : `https://decosa.samous.fr`
+   - **Authorization callback URL** : `https://api.samous.fr/api/auth/callback/github`
+3. Copiez le Client ID et Client Secret dans vos variables d'environnement (dans `apps/server/.env`)
 
 ## Étape 11 : Vérifier que tout fonctionne
 
@@ -509,6 +589,36 @@ Considérez d'utiliser :
 - **CloudWatch** pour monitorer l'instance EC2
 - **PM2 Plus** (optionnel) pour le monitoring des applications
 - **Sentry** pour le tracking des erreurs
+
+## Récapitulatif de la configuration
+
+### URLs de votre application
+
+- **Frontend** : `https://decosa.samous.fr`
+- **API Backend** : `https://api.samous.fr`
+- **GitHub OAuth Callback** : `https://api.samous.fr/api/auth/callback/github`
+
+### Variables d'environnement importantes
+
+**Frontend (`apps/web/.env.local`)** :
+
+```env
+NEXT_PUBLIC_SERVER_URL=https://api.samous.fr
+```
+
+**Backend (`apps/server/.env`)** :
+
+```env
+CORS_ORIGIN=https://decosa.samous.fr
+BETTER_AUTH_URL=https://api.samous.fr
+```
+
+### Ports utilisés
+
+- **3000** : Backend API (accessible uniquement via Nginx)
+- **3001** : Frontend Next.js (accessible uniquement via Nginx)
+- **80** : HTTP (redirige vers HTTPS)
+- **443** : HTTPS (Nginx reverse proxy)
 
 ## Coûts estimés
 

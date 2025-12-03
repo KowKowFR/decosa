@@ -34,7 +34,10 @@
     "@aws-sdk/s3-request-presigner": "^3.943.0",
     "@radix-ui/react-slot": "^1.2.4",
     "dotenv": "^17.2.2",
+    "embla-carousel-react": "^8.6.0",
     "framer-motion": "^12.23.25",
+    "react-day-picker": "^9.11.3",
+    "recharts": "^3.5.1",
     "zod": "^4.1.11"
   },
   "devDependencies": {
